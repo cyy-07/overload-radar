@@ -25,6 +25,29 @@ type AnalyzeResponse = {
   plans: Record<"A" | "B" | "C", PlanCard>;
 };
 
+type WhatIfDraft = {
+  eventName: string;
+  time: string;
+  duration: string;
+  priority: "Low" | "Medium" | "High";
+  note: string;
+};
+
+type ScenarioPlan = {
+  key: "A" | "B" | "C";
+  label: string;
+  subtitle: string;
+  tag: string;
+  tagClass: "tag-low" | "tag-mid" | "tag-high";
+  stress: number;
+  feasibility: number;
+  changes: string;
+  impact: string;
+  tradeoff: string;
+  cuts: string[];
+  curve: number[];
+};
+
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 const WEEK_AXIS = ["M", "T", "W", "T", "F", "S", "S"] as const;
 const HOURS = Array.from({ length: 24 }, (_, index) => index);
@@ -90,13 +113,11 @@ function createDemoPlanner(): PlannerState {
   planner.Tue[12] = "EE 132";
   planner.Tue[13] = "EE 132";
   planner.Tue[18] = "CEE 132";
-
   planner.Wed[8] = "Student assistant";
   planner.Wed[9] = "Student assistant";
   planner.Wed[10] = "Student assistant";
   planner.Wed[11] = "Student assistant";
   planner.Wed[15] = "CS 228";
-
   planner.Thu[8] = "CHE 160A";
   planner.Thu[9] = "CHE 160A";
   planner.Thu[12] = "EE 132";
@@ -105,13 +126,11 @@ function createDemoPlanner(): PlannerState {
   planner.Thu[15] = "Student assistant";
   planner.Thu[16] = "Student assistant + CHE 160A sec";
   planner.Thu[17] = "Student assistant";
-
   planner.Fri[8] = "Student assistant";
   planner.Fri[9] = "Student assistant";
   planner.Fri[10] = "Student assistant";
   planner.Fri[11] = "Student assistant";
   planner.Fri[15] = "CS 228";
-
   planner.Mon[15] = "CS 228";
   planner.Sat[13] = "Deep learning review";
   planner.Sun[14] = "Lab report + prep";
@@ -124,47 +143,14 @@ function bandForRisk(score: number) {
   return { label: "High", className: "high" };
 }
 
-function getPlanDefinition(key: "A" | "B" | "C") {
-  if (key === "A") {
-    return {
-      title: "Baseline Reality",
-      subtitle: "No intervention",
-      fallbackSummary:
-        "Keep the current week unchanged and test whether the existing load already pushes the system toward overload.",
-      fallbackCuts: ["No cuts", "Keep all deadlines", "Reality as-is"],
-    };
-  }
-
-  if (key === "B") {
-    return {
-      title: "Tradeoff Shift",
-      subtitle: "Small sacrifice",
-      fallbackSummary:
-        "Protect one life event by delaying a lower-priority task and compressing lighter study blocks.",
-      fallbackCuts: ["Delay one low-priority task", "Reduce reading depth", "Compress one study block"],
-    };
-  }
-
-  return {
-    title: "Recovery / Crisis Mode",
-    subtitle: "Protect the system",
-    fallbackSummary:
-      "Restructure the week hard to avoid crossing the crash boundary when stress is already elevated.",
-    fallbackCuts: ["Drop optional work", "Reduce assignment scope", "Preserve sleep + core deadlines"],
-  };
-}
-
 function buildStressCurve(score: number, key: "A" | "B" | "C") {
   const curveMap: Record<"A" | "B" | "C", number[]> = {
-    A: [-18, -8, 0, 4, 10, 6, -4],
-    B: [-14, -2, 8, 14, 18, 8, -2],
-    C: [-10, 8, 18, 24, 30, 14, 6],
+    A: [-16, -6, 4, 12, 18, 10, 6],
+    B: [-12, -2, 2, 7, 10, 4, 1],
+    C: [-14, -8, -4, 0, 2, -3, -5],
   };
 
-  return curveMap[key].map((delta) => {
-    const next = Math.max(12, Math.min(100, score + delta));
-    return next;
-  });
+  return curveMap[key].map((delta) => Math.max(18, Math.min(96, score + delta)));
 }
 
 function buildSmoothLinePath(points: number[]) {
@@ -180,10 +166,7 @@ function buildSmoothLinePath(points: number[]) {
     return { x, y };
   });
 
-  if (coordinates.length === 0) {
-    return "";
-  }
-
+  if (!coordinates.length) return "";
   let path = `M ${coordinates[0].x} ${coordinates[0].y}`;
   for (let index = 0; index < coordinates.length - 1; index += 1) {
     const current = coordinates[index];
@@ -191,7 +174,6 @@ function buildSmoothLinePath(points: number[]) {
     const controlX = (current.x + next.x) / 2;
     path += ` C ${controlX} ${current.y}, ${controlX} ${next.y}, ${next.x} ${next.y}`;
   }
-
   return path;
 }
 
@@ -203,13 +185,6 @@ export default function Home() {
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerFocusDay, setPlannerFocusDay] = useState<(typeof DAYS)[number]>("Tue");
   const [expandedInput, setExpandedInput] = useState<ToggleKey>("courses");
-  const [activeSections, setActiveSections] = useState<Record<ToggleKey, boolean>>({
-    courses: true,
-    assignments: true,
-    exams: true,
-    schedule: true,
-    lifeEvents: true,
-  });
   const [selectedUploadTarget, setSelectedUploadTarget] = useState<ToggleKey>("courses");
   const [loading, setLoading] = useState(false);
   const [voiceLoading, setVoiceLoading] = useState<null | "calm" | "emergency">(null);
@@ -217,13 +192,20 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
-
-  const recommendedPlan = useMemo(() => {
-    if (!result) return null;
-    return Object.entries(result.plans).sort(
-      (a, b) => b[1].feasibility_score - a[1].feasibility_score
-    )[0];
-  }, [result]);
+  const [whatIfDraft, setWhatIfDraft] = useState<WhatIfDraft>({
+    eventName: "NBA playoff game",
+    time: "Saturday 7:30 PM",
+    duration: "4 hours",
+    priority: "High",
+    note: "Optional social event with friends",
+  });
+  const [whatIfScenario, setWhatIfScenario] = useState<WhatIfDraft>({
+    eventName: "NBA playoff game",
+    time: "Saturday 7:30 PM",
+    duration: "4 hours",
+    priority: "High",
+    note: "Optional social event with friends",
+  });
 
   const plannerSummary = useMemo(
     () =>
@@ -233,48 +215,80 @@ export default function Home() {
           .filter(Boolean)
           .join(", ");
         return `${day}: ${entries || "Open"}`;
-      })
-        .join("\n")
-        .trim(),
+      }).join("\n"),
     [planner]
   );
 
   const riskBand = bandForRisk(result?.risk_score ?? 0);
-  const planEntries = useMemo(
+  const priorityLoad =
+    whatIfScenario.priority === "High" ? 16 : whatIfScenario.priority === "Medium" ? 10 : 6;
+
+  const planEntries = useMemo<ScenarioPlan[]>(() => {
+    const baselineStress = result?.stress_before ?? 44;
+    const name = whatIfScenario.eventName || "event";
+    const time = whatIfScenario.time || "this week";
+    const duration = whatIfScenario.duration || "a few hours";
+
+    const scenarios: ScenarioPlan[] = [
+      {
+        key: "A",
+        label: "Go and enjoy fully",
+        subtitle: "Attend the event with no major adjustments",
+        tag: "Highest stress",
+        tagClass: "tag-high",
+        stress: Math.min(95, baselineStress + priorityLoad + 16),
+        feasibility: Math.max(42, 76 - priorityLoad),
+        changes: `Attend ${name} at ${time} for ${duration}.`,
+        impact: "Best convenience and fun, but the week absorbs the full hit.",
+        tradeoff: "Highest overload risk after the event.",
+        cuts: ["Recovery time shrinks", "Study load stays crowded", "No major reshuffle"],
+        curve: [],
+      },
+      {
+        key: "B",
+        label: "Go, but finish work earlier",
+        subtitle: "Protect the event by moving work earlier",
+        tag: "Most balanced",
+        tagClass: "tag-mid",
+        stress: Math.min(82, baselineStress + Math.round(priorityLoad * 0.7) + 6),
+        feasibility: Math.max(60, 86 - Math.round(priorityLoad / 2)),
+        changes: `Front-load key work before ${name}.`,
+        impact: "Stress rises moderately, but deadlines remain manageable.",
+        tradeoff: "You keep the event by compressing earlier study blocks.",
+        cuts: ["Move one task earlier", "Compress reading depth", "Protect core deadlines"],
+        curve: [],
+      },
+      {
+        key: "C",
+        label: "Do not go",
+        subtitle: "Keep the week stable and protect workload",
+        tag: "Lowest stress",
+        tagClass: "tag-low",
+        stress: Math.max(28, baselineStress - 6),
+        feasibility: Math.min(96, 91 + Math.max(0, 5 - Math.round(priorityLoad / 4))),
+        changes: `Skip ${name} and keep the week stable.`,
+        impact: "Lowest stress and highest feasibility for the current workload.",
+        tradeoff: "You sacrifice the event to protect the schedule.",
+        cuts: ["Cut the event itself", "Keep recovery window", "Keep workload unchanged"],
+        curve: [],
+      },
+    ];
+
+    return scenarios.map((plan) => ({
+      ...plan,
+      curve: buildStressCurve(plan.stress, plan.key),
+    }));
+  }, [priorityLoad, result, whatIfScenario]);
+
+  const recommendedPlan = useMemo(
     () =>
-      (["A", "B", "C"] as const).map((key) => {
-        const incoming = result?.plans[key];
-        const definition = getPlanDefinition(key);
-        const stress =
-          incoming?.stress_score ??
-          (key === "A"
-            ? Math.max(result?.stress_before ?? 46, 46)
-            : key === "B"
-              ? Math.max((result?.stress_before ?? 46) + 10, 58)
-              : Math.max((result?.stress_before ?? 46) + 18, 68));
-
-        return {
-          key,
-          label: incoming?.label ?? definition.title,
-          subtitle: definition.subtitle,
-          feasibility: incoming?.feasibility_score ?? (key === "A" ? 92 : key === "B" ? 74 : 58),
-          summary: incoming?.summary ?? definition.fallbackSummary,
-          cuts:
-            incoming && incoming.removed.length > 0
-              ? incoming.removed.slice(0, 3)
-              : definition.fallbackCuts,
-          stress,
-          curve: buildStressCurve(stress, key),
-        };
-      }),
-    [result]
+      [...planEntries].sort((a, b) => {
+        const scoreA = a.feasibility - a.stress * 0.45;
+        const scoreB = b.feasibility - b.stress * 0.45;
+        return scoreB - scoreA;
+      })[0],
+    [planEntries]
   );
-
-  function toggleSection(key: ToggleKey) {
-    setExpandedInput(key);
-    setActiveSections((current) => ({ ...current, [key]: !current[key] || !current[key] }));
-    setSelectedUploadTarget(key);
-  }
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -284,7 +298,6 @@ export default function Home() {
       ...current,
       [selectedUploadTarget]: text.slice(0, 12000),
     }));
-    setActiveSections((current) => ({ ...current, [selectedUploadTarget]: true }));
     event.target.value = "";
   }
 
@@ -301,13 +314,6 @@ export default function Home() {
     setForm(DEMO_STATE);
     setPlanner(createDemoPlanner());
     setPlannerFocusDay("Tue");
-    setActiveSections({
-      courses: true,
-      assignments: true,
-      exams: true,
-      schedule: true,
-      lifeEvents: true,
-    });
   }
 
   async function handleAnalyze() {
@@ -321,11 +327,11 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workload_text: form.workloadText,
-          syllabus: activeSections.courses ? form.courses : "",
-          assignments: activeSections.assignments ? form.assignments : "",
-          exam_samples: activeSections.exams ? form.exams : "",
-          schedule: activeSections.schedule ? `${form.schedule}\n\nWeekly planner:\n${plannerSummary}` : "",
-          life_events: activeSections.lifeEvents ? form.lifeEvents : "",
+          syllabus: form.courses,
+          assignments: form.assignments,
+          exam_samples: form.exams,
+          schedule: `${form.schedule}\n\nWeekly planner:\n${plannerSummary}`,
+          life_events: form.lifeEvents,
           time_constraints: "Protect sleep. Preserve grade-critical work first.",
         }),
       });
@@ -338,6 +344,10 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleSimulateImpact() {
+    setWhatIfScenario(whatIfDraft);
   }
 
   async function handleVoice(mode: "calm" | "emergency") {
@@ -370,9 +380,7 @@ export default function Home() {
         throw new Error(json.error || "Voice playback failed");
       }
       if (json.used_mock) {
-        setVoiceStatus(
-          `Mock voice fallback active${json.hint ? ` because ${json.hint}.` : "."}`
-        );
+        setVoiceStatus(`Mock voice fallback active${json.hint ? ` because ${json.hint}.` : "."}`);
       }
       if (audioRef.current) {
         audioRef.current.src = json.audio_url;
@@ -405,7 +413,7 @@ export default function Home() {
 
         {result?.used_mock && (
           <div className="status">
-            Mock analysis active{result.mock_reason ? `: ${result.mock_reason}` : "."}
+            Demo-safe mode active: Gemini is unavailable, but the what-if simulator below still works.
           </div>
         )}
         {error && <div className="error">{error}</div>}
@@ -413,8 +421,8 @@ export default function Home() {
         <section className="panel input-panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">1. Input panel</div>
-              <h2>Workload intake</h2>
+              <div className="eyebrow">1. Intake</div>
+              <h2>Workload + event input</h2>
             </div>
             <div className="upload-row">
               <button className="ghost-btn" onClick={() => uploadRef.current?.click()}>
@@ -439,8 +447,11 @@ export default function Home() {
               return (
                 <button
                   key={field.key}
-                  className={`toggle-chip ${active ? "on selected" : "idle"} `}
-                  onClick={() => toggleSection(field.key)}
+                  className={`toggle-chip ${active ? "on selected" : "idle"}`}
+                  onClick={() => {
+                    setExpandedInput(field.key);
+                    setSelectedUploadTarget(field.key);
+                  }}
                   type="button"
                 >
                   <span className="toggle-dot" />
@@ -450,31 +461,16 @@ export default function Home() {
             })}
           </div>
 
-          <div className="input-accent-row">
-            <div className="input-accent-card accent-courses">
-              <span className="accent-label">Course load</span>
-              <strong>5 tracked class blocks</strong>
-            </div>
-            <div className="input-accent-card accent-work">
-              <span className="accent-label">Fixed work time</span>
-              <strong>11.5h student assistant</strong>
-            </div>
-            <div className="input-accent-card accent-mode">
-              <span className="accent-label">Input mode</span>
-              <strong>Upload + quick planner edit</strong>
-            </div>
-          </div>
-
           <div className="input-grid">
             <label className="field wide">
               <span>Workload</span>
               <textarea
                 className="textarea compact"
-                placeholder="Courses, labs, work shifts, commute..."
                 value={form.workloadText}
-                onChange={(e) =>
-                  setForm((current) => ({ ...current, workloadText: e.target.value }))
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, workloadText: event.target.value }))
                 }
+                placeholder="Courses, labs, work shifts, commute..."
               />
             </label>
 
@@ -483,9 +479,11 @@ export default function Home() {
                 <span>Courses</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste courses"
                   value={form.courses}
-                  onChange={(e) => setForm((current) => ({ ...current, courses: e.target.value }))}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, courses: event.target.value }))
+                  }
+                  placeholder="Upload or paste courses"
                 />
               </label>
             )}
@@ -495,11 +493,11 @@ export default function Home() {
                 <span>Assignments</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste assignments"
                   value={form.assignments}
-                  onChange={(e) =>
-                    setForm((current) => ({ ...current, assignments: e.target.value }))
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, assignments: event.target.value }))
                   }
+                  placeholder="Upload or paste assignments"
                 />
               </label>
             )}
@@ -509,9 +507,11 @@ export default function Home() {
                 <span>Exams</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste exams"
                   value={form.exams}
-                  onChange={(e) => setForm((current) => ({ ...current, exams: e.target.value }))}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, exams: event.target.value }))
+                  }
+                  placeholder="Upload or paste exams"
                 />
               </label>
             )}
@@ -521,11 +521,11 @@ export default function Home() {
                 <span>Schedule</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste schedule"
                   value={form.schedule}
-                  onChange={(e) =>
-                    setForm((current) => ({ ...current, schedule: e.target.value }))
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, schedule: event.target.value }))
                   }
+                  placeholder="Upload or paste schedule"
                 />
               </label>
             )}
@@ -535,14 +535,90 @@ export default function Home() {
                 <span>Life events</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Optional life events"
                   value={form.lifeEvents}
-                  onChange={(e) =>
-                    setForm((current) => ({ ...current, lifeEvents: e.target.value }))
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, lifeEvents: event.target.value }))
                   }
+                  placeholder="Optional life events"
                 />
               </label>
             )}
+          </div>
+
+          <div className="what-if-card">
+            <div className="planner-head">
+              <div>
+                <div className="eyebrow">What-if input</div>
+                <h3>Would this extra event break the week?</h3>
+              </div>
+              <button className="primary-btn" onClick={handleSimulateImpact} type="button">
+                Simulate impact
+              </button>
+            </div>
+
+            <div className="what-if-grid">
+              <label className="field">
+                <span>Event name</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.eventName}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, eventName: event.target.value }))
+                  }
+                  placeholder="NBA playoff game"
+                />
+              </label>
+              <label className="field">
+                <span>Time</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.time}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, time: event.target.value }))
+                  }
+                  placeholder="Saturday 7:30 PM"
+                />
+              </label>
+              <label className="field">
+                <span>Duration</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.duration}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, duration: event.target.value }))
+                  }
+                  placeholder="4 hours"
+                />
+              </label>
+              <label className="field">
+                <span>Priority</span>
+                <select
+                  className="inline-input"
+                  value={whatIfDraft.priority}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({
+                      ...current,
+                      priority: event.target.value as WhatIfDraft["priority"],
+                    }))
+                  }
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </label>
+              <label className="field wide">
+                <span>Optional note</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.note}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, note: event.target.value }))
+                  }
+                  placeholder="Optional social event with friends"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="planner-card">
@@ -551,11 +627,7 @@ export default function Home() {
                 <div className="eyebrow">Weekly planner</div>
                 <h3>Week snapshot</h3>
               </div>
-              <button
-                className="soft-btn"
-                onClick={() => setPlannerOpen(true)}
-                type="button"
-              >
+              <button className="soft-btn" onClick={() => setPlannerOpen(true)} type="button">
                 Open full week
               </button>
             </div>
@@ -597,30 +669,29 @@ export default function Home() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">2. Risk + summary</div>
-              <h2>Decision dashboard</h2>
+              <div className="eyebrow">2. Dashboard</div>
+              <h2>Risk + workload summary</h2>
             </div>
-            {recommendedPlan && <div className="score-pill">Recommended {recommendedPlan[0]}</div>}
+            <div className="score-pill">{recommendedPlan.key} currently balances best</div>
           </div>
 
           <div className="dashboard-grid">
             <article className="card risk-card">
               <div className="eyebrow">Risk score</div>
               <div className="risk-score">
-                <strong>{result ? Math.round(result.risk_score) : "--"}</strong>
+                <strong>{result ? Math.round(result.risk_score) : 61}</strong>
                 <div className={`risk-band ${riskBand.className}`}>{riskBand.label}</div>
               </div>
               <div className="meter meter-risk">
-                <span style={{ width: `${result ? result.risk_score : 0}%` }} />
+                <span style={{ width: `${result ? result.risk_score : 61}%` }} />
               </div>
             </article>
 
             <article className="card summary-card">
               <div className="eyebrow">Summary</div>
               <p className="summary-line">
-                {result
-                  ? result.summary
-                  : "Run analysis to see overload risk, stress change, and plan comparison."}
+                {result?.summary ??
+                  "Your workload is already tight. The main question is whether the extra event pushes stress past a manageable range."}
               </p>
             </article>
 
@@ -630,28 +701,31 @@ export default function Home() {
                 <div className="bar-row">
                   <div className="bar-label">
                     <span>Before</span>
-                    <span>{result ? result.stress_before : "--"}</span>
+                    <span>{result?.stress_before ?? 44}</span>
                   </div>
                   <div className="meter bar-before">
-                    <span style={{ width: `${result ? result.stress_before : 0}%` }} />
+                    <span style={{ width: `${result?.stress_before ?? 44}%` }} />
                   </div>
                 </div>
                 <div className="bar-row">
                   <div className="bar-label">
-                    <span>After</span>
-                    <span>{result ? result.stress_after : "--"}</span>
+                    <span>After event</span>
+                    <span>{recommendedPlan.stress}</span>
                   </div>
                   <div className="meter bar-after">
-                    <span style={{ width: `${result ? result.stress_after : 0}%` }} />
+                    <span style={{ width: `${recommendedPlan.stress}%` }} />
                   </div>
                 </div>
               </div>
             </article>
 
             <article className="card cuts-card">
-              <div className="eyebrow">Cut recommendations</div>
+              <div className="eyebrow">Cuts</div>
               <ul className="cut-list">
-                {(result?.cut_recommendations ?? ["Cuts will appear here."])
+                {(result?.cut_recommendations?.length
+                  ? result.cut_recommendations
+                  : recommendedPlan.cuts
+                )
                   .slice(0, 4)
                   .map((item) => (
                     <li key={item}>{item}</li>
@@ -664,29 +738,46 @@ export default function Home() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">3. Plan comparison</div>
-              <h2>Plan A / B / C simulation</h2>
+              <div className="eyebrow">3. What-if simulation</div>
+              <h2>Three futures. One decision.</h2>
             </div>
+            <div className="score-pill">{whatIfScenario.eventName}</div>
           </div>
 
           <div className="curve-board">
             {planEntries.map((plan) => (
-              <article key={`curve-${plan.key}`} className={`curve-card curve-${plan.key.toLowerCase()}`}>
+              <article key={plan.key} className={`curve-card curve-${plan.key.toLowerCase()}`}>
                 <div className="curve-head">
                   <div>
                     <div className="curve-key">Plan {plan.key}</div>
                     <h3>{plan.label}</h3>
                   </div>
-                  <div className="score-chip">Stress {plan.stress}</div>
+                  <div className={`scenario-tag ${plan.tagClass}`}>{plan.tag}</div>
                 </div>
                 <div className="curve-svg-wrap">
-                  <svg viewBox="0 0 280 120" className="curve-svg" role="img" aria-label={`${plan.label} stress curve`}>
+                  <svg
+                    viewBox="0 0 280 120"
+                    className="curve-svg"
+                    role="img"
+                    aria-label={`${plan.label} stress curve`}
+                  >
                     <path d="M 14 106 H 266" className="curve-axis-line" />
-                    <path d={buildSmoothLinePath(plan.curve)} className={`curve-path curve-path-${plan.key.toLowerCase()}`} />
+                    <path
+                      d={buildSmoothLinePath(plan.curve)}
+                      className={`curve-path curve-path-${plan.key.toLowerCase()}`}
+                    />
                     {plan.curve.map((point, index) => {
                       const x = 14 + ((280 - 28) / (plan.curve.length - 1)) * index;
                       const y = 120 - 14 - (point / 100) * (120 - 28);
-                      return <circle key={`${plan.key}-point-${index}`} cx={x} cy={y} r="3.5" className={`curve-point curve-point-${plan.key.toLowerCase()}`} />;
+                      return (
+                        <circle
+                          key={`${plan.key}-${index}`}
+                          cx={x}
+                          cy={y}
+                          r="3.5"
+                          className={`curve-point curve-point-${plan.key.toLowerCase()}`}
+                        />
+                      );
                     })}
                   </svg>
                   <div className="curve-axis-labels">
@@ -700,25 +791,46 @@ export default function Home() {
           </div>
 
           <div className="plans-grid">
-            {planEntries.map((plan) => {
-              return (
-                <article key={plan.key} className={`plan-card plan-${plan.key.toLowerCase()}`}>
-                  <div className="plan-top">
-                    <div className="plan-key">{plan.key}</div>
-                    <div className="score-chip">Feasibility {plan.feasibility}%</div>
-                  </div>
-                  <h3>{plan.label}</h3>
-                  <p className="tiny plan-subtitle">{plan.subtitle}</p>
-                  <p className="micro-copy">{plan.summary}</p>
-                  <div className="tiny plan-stats">Stress {plan.stress} · Feasibility {plan.feasibility}%</div>
-                  <ul className="plan-cut-list">
-                    {plan.cuts.map((item) => (
-                      <li key={`${plan.key}-${item}`}>{item}</li>
-                    ))}
-                  </ul>
-                </article>
-              );
-            })}
+            {planEntries.map((plan) => (
+              <article key={plan.key} className={`plan-card plan-${plan.key.toLowerCase()}`}>
+                <div className="plan-top">
+                  <div className="plan-key">{plan.key}</div>
+                  <div className="score-chip">Feasibility {plan.feasibility}%</div>
+                </div>
+                <h3>{plan.label}</h3>
+                <p className="tiny plan-subtitle">{plan.subtitle}</p>
+                <div className="metric-row">
+                  <div className="metric-pill">Stress {plan.stress}</div>
+                  <div className="metric-pill">Feasibility {plan.feasibility}%</div>
+                </div>
+                <p className="micro-copy">
+                  <strong>What changes:</strong> {plan.changes}
+                </p>
+                <p className="micro-copy">
+                  <strong>Impact:</strong> {plan.impact}
+                </p>
+                <p className="micro-copy">
+                  <strong>Tradeoff:</strong> {plan.tradeoff}
+                </p>
+                <ul className="plan-cut-list">
+                  {plan.cuts.map((item) => (
+                    <li key={`${plan.key}-${item}`}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+
+          <div className="recommend-card">
+            <div className="eyebrow">Recommended option</div>
+            <div className="recommend-grid">
+              <div className="recommend-key">{recommendedPlan.key}</div>
+              <div>
+                <h3>{recommendedPlan.label}</h3>
+                <p className="micro-copy">Why: {recommendedPlan.impact}</p>
+                <p className="tiny">Impact: {recommendedPlan.tradeoff}</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -753,7 +865,7 @@ export default function Home() {
                 <input
                   type="checkbox"
                   checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
+                  onChange={(event) => setConsent(event.target.checked)}
                 />
                 <span>AI-generated voice</span>
               </label>
@@ -804,7 +916,9 @@ export default function Home() {
                             key={`${day}-${hour}`}
                             className="planner-cell-input"
                             value={planner[day][hour]}
-                            onChange={(e) => handlePlannerCellChange(day, hour, e.target.value)}
+                            onChange={(event) =>
+                              handlePlannerCellChange(day, hour, event.target.value)
+                            }
                             onFocus={() => setPlannerFocusDay(day)}
                             placeholder={hour === 0 ? "Add event" : ""}
                           />
