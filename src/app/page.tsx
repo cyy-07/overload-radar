@@ -427,20 +427,31 @@ export default function Home() {
   }
 
   async function handleVoice(mode: "calm" | "emergency") {
-    if (!result) return;
+    if (!consent) {
+      setError(
+        "Please tick the 'AI-generated voice' consent checkbox below before playing."
+      );
+      return;
+    }
     setVoiceLoading(mode);
     setError(null);
     setVoiceStatus(null);
+
+    const calmFallback =
+      "Take a breath. Your workload is tight, but the plan already shows a clearer path. Focus on the next decision only.";
+    const emergencyFallback =
+      "Pause for a moment. You are not behind. Put down the heaviest task, breathe slowly, and we will re-plan together.";
+    const script =
+      mode === "emergency"
+        ? result?.emergency_voice_script || result?.voice_script || emergencyFallback
+        : result?.voice_script || calmFallback;
 
     try {
       const response = await fetch("/api/generate-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          voice_script:
-            mode === "emergency"
-              ? result.emergency_voice_script || result.voice_script
-              : result.voice_script,
+          voice_script: script,
           mode,
           consent,
         }),
@@ -967,14 +978,14 @@ export default function Home() {
                 <button
                   className="secondary-btn"
                   onClick={() => handleVoice("calm")}
-                  disabled={!result || voiceLoading !== null}
+                  disabled={voiceLoading !== null}
                 >
                   {voiceLoading === "calm" ? "Generating..." : "Play Calm Voice"}
                 </button>
                 <button
                   className="danger-btn"
                   onClick={() => handleVoice("emergency")}
-                  disabled={!result || voiceLoading !== null}
+                  disabled={voiceLoading !== null}
                 >
                   {voiceLoading === "emergency" ? "Generating..." : "Emergency Comfort Mode"}
                 </button>
