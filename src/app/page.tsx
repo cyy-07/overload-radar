@@ -215,6 +215,13 @@ export default function Home() {
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [plannerFocusDay, setPlannerFocusDay] = useState<(typeof DAYS)[number]>("Tue");
   const [expandedInput, setExpandedInput] = useState<ToggleKey>("courses");
+  const [whatIfDraft, setWhatIfDraft] = useState({
+    eventName: "NBA playoff game",
+    time: "Saturday 7:30 PM",
+    duration: "4 hours",
+    priority: "High" as "Low" | "Medium" | "High",
+    note: "Optional social event with friends",
+  });
   const [activeSections, setActiveSections] = useState<Record<ToggleKey, boolean>>({
     courses: true,
     assignments: true,
@@ -411,7 +418,14 @@ export default function Home() {
           assignments: activeSections.assignments ? form.assignments : "",
           exam_samples: activeSections.exams ? form.exams : "",
           schedule: activeSections.schedule ? `${form.schedule}\n\nWeekly planner:\n${plannerSummary}` : "",
-          life_events: activeSections.lifeEvents ? form.lifeEvents : "",
+          life_events: [
+            activeSections.lifeEvents ? form.lifeEvents : "",
+            whatIfDraft.eventName
+              ? `What-if event: ${whatIfDraft.eventName} on ${whatIfDraft.time || "this week"}, lasting ${whatIfDraft.duration || "a few hours"}. Priority: ${whatIfDraft.priority}. Note: ${whatIfDraft.note || "n/a"}.`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
           time_constraints: "Protect sleep. Preserve grade-critical work first.",
         }),
       });
@@ -681,6 +695,81 @@ export default function Home() {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="what-if-card" style={{ marginTop: 16, padding: 16, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, background: "rgba(255,255,255,0.03)" }}>
+            <div className="planner-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <div className="eyebrow">What-if input</div>
+                <h3 style={{ margin: 0 }}>Would this extra event break the week?</h3>
+              </div>
+            </div>
+            <div className="what-if-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              <label className="field">
+                <span>Event name</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.eventName}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, eventName: event.target.value }))
+                  }
+                  placeholder="NBA playoff game"
+                />
+              </label>
+              <label className="field">
+                <span>Time</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.time}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, time: event.target.value }))
+                  }
+                  placeholder="Saturday 7:30 PM"
+                />
+              </label>
+              <label className="field">
+                <span>Duration</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.duration}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, duration: event.target.value }))
+                  }
+                  placeholder="4 hours"
+                />
+              </label>
+              <label className="field">
+                <span>Priority</span>
+                <select
+                  className="inline-input"
+                  value={whatIfDraft.priority}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({
+                      ...current,
+                      priority: event.target.value as "Low" | "Medium" | "High",
+                    }))
+                  }
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </label>
+              <label className="field" style={{ gridColumn: "span 2" }}>
+                <span>Optional note</span>
+                <input
+                  className="inline-input"
+                  value={whatIfDraft.note}
+                  onChange={(event) =>
+                    setWhatIfDraft((current) => ({ ...current, note: event.target.value }))
+                  }
+                  placeholder="Optional social event with friends"
+                />
+              </label>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
+              This event is fed into the analysis. Click &ldquo;Analyze Overload&rdquo; below to simulate.
             </div>
           </div>
 
