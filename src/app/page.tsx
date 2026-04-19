@@ -208,6 +208,19 @@ function buildSmoothLinePath(points: number[]) {
 }
 
 export default function Home() {
+  const [lang, setLang] = useState<"en" | "zh">("en");
+  const t = (en: string, zh: string) => (lang === "zh" ? zh : en);
+  const fieldLabel = (key: ToggleKey) => {
+    const map: Record<ToggleKey, [string, string]> = {
+      courses: ["Courses", "课程"],
+      assignments: ["Assignments", "作业"],
+      exams: ["Exams", "考试"],
+      schedule: ["Schedule", "日程"],
+      lifeEvents: ["Life events", "生活事件"],
+    };
+    const [en, zh] = map[key];
+    return t(en, zh);
+  };
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [form, setForm] = useState(DEMO_STATE);
@@ -431,10 +444,10 @@ export default function Home() {
       });
 
       const json = (await response.json()) as AnalyzeResponse & { error?: string };
-      if (!response.ok) throw new Error(json.error || "Analysis failed");
+      if (!response.ok) throw new Error(json.error || t("Analysis failed", "分析失败"));
       setResult(json);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Analysis failed");
+      setError(caught instanceof Error ? caught.message : t("Analysis failed", "分析失败"));
     } finally {
       setLoading(false);
     }
@@ -443,7 +456,10 @@ export default function Home() {
   async function handleVoice(mode: "calm" | "emergency") {
     if (!consent) {
       setError(
-        "Please tick the 'AI-generated voice' consent checkbox below before playing."
+        t(
+          "Please tick the 'AI-generated voice' consent checkbox below before playing.",
+          "播放前请先勾选下方的 “AI 生成语音” 同意选项。"
+        )
       );
       return;
     }
@@ -478,11 +494,14 @@ export default function Home() {
         hint?: string;
       };
       if (!response.ok || !json.audio_url) {
-        throw new Error(json.error || "Voice playback failed");
+        throw new Error(json.error || t("Voice playback failed", "语音播放失败"));
       }
       if (json.used_mock) {
         setVoiceStatus(
-          `Mock voice fallback active${json.hint ? ` because ${json.hint}.` : "."}`
+          t(
+            `Mock voice fallback active${json.hint ? ` because ${json.hint}.` : "."}`,
+            `已启用模拟语音回退${json.hint ? `，原因：${json.hint}。` : "。"}`
+          )
         );
       }
       if (audioRef.current) {
@@ -490,7 +509,7 @@ export default function Home() {
         void audioRef.current.play().catch(() => undefined);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Voice playback failed");
+      setError(caught instanceof Error ? caught.message : t("Voice playback failed", "语音播放失败"));
     } finally {
       setVoiceLoading(null);
     }
@@ -508,15 +527,18 @@ export default function Home() {
             </div>
             <div>
               <div className="eyebrow">Fluxmind</div>
-              <p className="title">See overload before you burn out</p>
+              <p className="title">{t("See overload before you burn out", "在燃尽之前看见超载")}</p>
             </div>
           </div>
-          <p className="tagline">Simulates stress, tradeoffs, and what to cut</p>
+          <p className="tagline">{t("Simulates stress, tradeoffs, and what to cut", "模拟压力、取舍与该砍掉的事项")}</p>
         </header>
 
         {result?.used_mock && (
           <div className="status">
-            Demo mode: running on curated simulation data so the what-if engine stays responsive.
+            {t(
+              "Demo mode: running on curated simulation data so the what-if engine stays responsive.",
+              "演示模式：使用精选的模拟数据运行，保证 what-if 引擎流畅响应。"
+            )}
           </div>
         )}
         {error && <div className="error">{error}</div>}
@@ -524,15 +546,15 @@ export default function Home() {
         <section className="panel input-panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">1. Input panel</div>
-              <h2>Workload intake</h2>
+              <div className="eyebrow">{t("1. Input panel", "1. 输入面板")}</div>
+              <h2>{t("Workload intake", "负荷采集")}</h2>
             </div>
             <div className="upload-row">
               <button className="ghost-btn" onClick={() => uploadRef.current?.click()}>
-                Upload file
+                {t("Upload file", "上传文件")}
               </button>
               <button className="soft-btn" onClick={loadMyData}>
-                My daily data
+                {t("My daily data", "加载我的数据")}
               </button>
               <input
                 ref={uploadRef}
@@ -555,7 +577,7 @@ export default function Home() {
                   type="button"
                 >
                   <span className="toggle-dot" />
-                  {field.label}
+                  {fieldLabel(field.key)}
                 </button>
               );
             })}
@@ -563,25 +585,25 @@ export default function Home() {
 
           <div className="input-accent-row">
             <div className="input-accent-card accent-courses">
-              <span className="accent-label">Course load</span>
-              <strong>5 tracked class blocks</strong>
+              <span className="accent-label">{t("Course load", "课程负荷")}</span>
+              <strong>{t("5 tracked class blocks", "5 个课程时段")}</strong>
             </div>
             <div className="input-accent-card accent-work">
-              <span className="accent-label">Fixed work time</span>
-              <strong>11.5h student assistant</strong>
+              <span className="accent-label">{t("Fixed work time", "固定工作时间")}</span>
+              <strong>{t("11.5h student assistant", "11.5 小时助理工作")}</strong>
             </div>
             <div className="input-accent-card accent-mode">
-              <span className="accent-label">Input mode</span>
-              <strong>Upload + quick planner edit</strong>
+              <span className="accent-label">{t("Input mode", "输入方式")}</span>
+              <strong>{t("Upload + quick planner edit", "上传 + 快速计划编辑")}</strong>
             </div>
           </div>
 
           <div className="input-grid">
             <label className="field wide">
-              <span>Workload</span>
+              <span>{t("Workload", "总体负荷")}</span>
               <textarea
                 className="textarea compact"
-                placeholder="Courses, labs, work shifts, commute..."
+                placeholder={t("Courses, labs, work shifts, commute...", "课程、实验、轮班、通勤……")}
                 value={form.workloadText}
                 onChange={(e) =>
                   setForm((current) => ({ ...current, workloadText: e.target.value }))
@@ -591,10 +613,10 @@ export default function Home() {
 
             {expandedInput === "courses" && (
               <label className="field">
-                <span>Courses</span>
+                <span>{t("Courses", "课程")}</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste courses"
+                  placeholder={t("Upload or paste courses", "上传或粘贴课程")}
                   value={form.courses}
                   onChange={(e) => setForm((current) => ({ ...current, courses: e.target.value }))}
                 />
@@ -603,10 +625,10 @@ export default function Home() {
 
             {expandedInput === "assignments" && (
               <label className="field">
-                <span>Assignments</span>
+                <span>{t("Assignments", "作业")}</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste assignments"
+                  placeholder={t("Upload or paste assignments", "上传或粘贴作业")}
                   value={form.assignments}
                   onChange={(e) =>
                     setForm((current) => ({ ...current, assignments: e.target.value }))
@@ -617,10 +639,10 @@ export default function Home() {
 
             {expandedInput === "exams" && (
               <label className="field">
-                <span>Exams</span>
+                <span>{t("Exams", "考试")}</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste exams"
+                  placeholder={t("Upload or paste exams", "上传或粘贴考试")}
                   value={form.exams}
                   onChange={(e) => setForm((current) => ({ ...current, exams: e.target.value }))}
                 />
@@ -629,10 +651,10 @@ export default function Home() {
 
             {expandedInput === "schedule" && (
               <label className="field">
-                <span>Schedule</span>
+                <span>{t("Schedule", "日程")}</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Upload or paste schedule"
+                  placeholder={t("Upload or paste schedule", "上传或粘贴日程")}
                   value={form.schedule}
                   onChange={(e) =>
                     setForm((current) => ({ ...current, schedule: e.target.value }))
@@ -643,10 +665,10 @@ export default function Home() {
 
             {expandedInput === "lifeEvents" && (
               <label className="field">
-                <span>Life events</span>
+                <span>{t("Life events", "生活事件")}</span>
                 <textarea
                   className="textarea compact"
-                  placeholder="Optional life events"
+                  placeholder={t("Optional life events", "可选的生活事件")}
                   value={form.lifeEvents}
                   onChange={(e) =>
                     setForm((current) => ({ ...current, lifeEvents: e.target.value }))
@@ -659,15 +681,15 @@ export default function Home() {
           <div className="planner-card">
             <div className="planner-head">
               <div>
-                <div className="eyebrow">Weekly planner</div>
-                <h3>Week snapshot</h3>
+                <div className="eyebrow">{t("Weekly planner", "本周计划")}</div>
+                <h3>{t("Week snapshot", "本周速览")}</h3>
               </div>
               <button
                 className="soft-btn"
                 onClick={() => setPlannerOpen(true)}
                 type="button"
               >
-                Open full week
+                {t("Open full week", "打开完整周视图")}
               </button>
             </div>
             <div className="planner-mini-grid">
@@ -681,7 +703,7 @@ export default function Home() {
                   }}
                   type="button"
                 >
-                  <div className="planner-day-head">{day}</div>
+                  <div className="planner-day-head">{t(day, ({ Mon: "周一", Tue: "周二", Wed: "周三", Thu: "周四", Fri: "周五", Sat: "周六", Sun: "周日" } as const)[day])}</div>
                   <div className="planner-mini-content">
                     {planner[day].some(Boolean)
                       ? planner[day]
@@ -691,7 +713,7 @@ export default function Home() {
                           .filter(Boolean)
                           .slice(0, 2)
                           .map((item, index) => <span key={`${day}-${index}`}>{item}</span>)
-                      : <span>Open</span>}
+                      : <span>{t("Open", "空闲")}</span>}
                   </div>
                 </button>
               ))}
@@ -701,46 +723,46 @@ export default function Home() {
           <div className="what-if-card" style={{ marginTop: 16, padding: 16, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, background: "rgba(255,255,255,0.03)" }}>
             <div className="planner-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div>
-                <div className="eyebrow">What-if input</div>
-                <h3 style={{ margin: 0 }}>Would this extra event break the week?</h3>
+                <div className="eyebrow">{t("What-if input", "What-if 输入")}</div>
+                <h3 style={{ margin: 0 }}>{t("Would this extra event break the week?", "加上这件事，这周还撑得住吗？")}</h3>
               </div>
             </div>
             <div className="what-if-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
               <label className="field">
-                <span>Event name</span>
+                <span>{t("Event name", "事件名")}</span>
                 <input
                   className="inline-input"
                   value={whatIfDraft.eventName}
                   onChange={(event) =>
                     setWhatIfDraft((current) => ({ ...current, eventName: event.target.value }))
                   }
-                  placeholder="NBA playoff game"
+                  placeholder={t("NBA playoff game", "NBA 季后赛")}
                 />
               </label>
               <label className="field">
-                <span>Time</span>
+                <span>{t("Time", "时间")}</span>
                 <input
                   className="inline-input"
                   value={whatIfDraft.time}
                   onChange={(event) =>
                     setWhatIfDraft((current) => ({ ...current, time: event.target.value }))
                   }
-                  placeholder="Saturday 7:30 PM"
+                  placeholder={t("Saturday 7:30 PM", "周六 19:30")}
                 />
               </label>
               <label className="field">
-                <span>Duration</span>
+                <span>{t("Duration", "时长")}</span>
                 <input
                   className="inline-input"
                   value={whatIfDraft.duration}
                   onChange={(event) =>
                     setWhatIfDraft((current) => ({ ...current, duration: event.target.value }))
                   }
-                  placeholder="4 hours"
+                  placeholder={t("4 hours", "4 小时")}
                 />
               </label>
               <label className="field">
-                <span>Priority</span>
+                <span>{t("Priority", "优先级")}</span>
                 <select
                   className="inline-input"
                   value={whatIfDraft.priority}
@@ -751,31 +773,34 @@ export default function Home() {
                     }))
                   }
                 >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
+                  <option value="Low">{t("Low", "低")}</option>
+                  <option value="Medium">{t("Medium", "中")}</option>
+                  <option value="High">{t("High", "高")}</option>
                 </select>
               </label>
               <label className="field" style={{ gridColumn: "span 2" }}>
-                <span>Optional note</span>
+                <span>{t("Optional note", "可选备注")}</span>
                 <input
                   className="inline-input"
                   value={whatIfDraft.note}
                   onChange={(event) =>
                     setWhatIfDraft((current) => ({ ...current, note: event.target.value }))
                   }
-                  placeholder="Optional social event with friends"
+                  placeholder={t("Optional social event with friends", "和朋友的可选社交活动")}
                 />
               </label>
             </div>
             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
-              This event is fed into the analysis. Click &ldquo;Analyze Overload&rdquo; below to simulate.
+              {t(
+                "This event is fed into the analysis. Click \u201cAnalyze Overload\u201d below to simulate.",
+                "该事件会进入分析。点击下方“分析负荷”开始模拟。"
+              )}
             </div>
           </div>
 
           <div className="cta-row">
             <button className="primary-btn" onClick={handleAnalyze} disabled={loading}>
-              {loading ? "Analyzing..." : "Analyze Overload"}
+              {loading ? t("Analyzing...", "分析中…") : t("Analyze Overload", "分析负荷")}
             </button>
           </div>
         </section>
@@ -783,18 +808,18 @@ export default function Home() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">2. Risk + summary</div>
-              <h2>Decision dashboard</h2>
+              <div className="eyebrow">{t("2. Risk + summary", "2. 风险与总结")}</div>
+              <h2>{t("Decision dashboard", "决策面板")}</h2>
             </div>
-            {recommendedPlan && <div className="score-pill">Recommended {recommendedPlan[0]}</div>}
+            {recommendedPlan && <div className="score-pill">{t("Recommended", "推荐")} {recommendedPlan[0]}</div>}
           </div>
 
           <div className="dashboard-grid">
             <article className="card risk-card">
-              <div className="eyebrow">Risk score</div>
+              <div className="eyebrow">{t("Risk score", "风险评分")}</div>
               <div className="risk-score">
                 <strong>{result ? Math.round(result.risk_score) : "--"}</strong>
-                <div className={`risk-band ${riskBand.className}`}>{riskBand.label}</div>
+                <div className={`risk-band ${riskBand.className}`}>{t(riskBand.label, ({ Stable: "平稳", Watch: "注意", High: "高风险" } as Record<string, string>)[riskBand.label] ?? riskBand.label)}</div>
               </div>
               <div className="meter meter-risk">
                 <span style={{ width: `${result ? result.risk_score : 0}%` }} />
@@ -802,20 +827,23 @@ export default function Home() {
             </article>
 
             <article className="card summary-card">
-              <div className="eyebrow">Summary</div>
+              <div className="eyebrow">{t("Summary", "总结")}</div>
               <p className="summary-line">
                 {result
                   ? result.summary
-                  : "Run analysis to see overload risk, stress change, and plan comparison."}
+                  : t(
+                      "Run analysis to see overload risk, stress change, and plan comparison.",
+                      "运行分析以查看超载风险、压力变化以及方案对比。"
+                    )}
               </p>
             </article>
 
             <article className="card stress-card">
-              <div className="eyebrow">Stress before / after</div>
+              <div className="eyebrow">{t("Stress before / after", "压力前后对比")}</div>
               <div className="bar-block">
                 <div className="bar-row">
                   <div className="bar-label">
-                    <span>Before</span>
+                    <span>{t("Before", "之前")}</span>
                     <span>{result ? result.stress_before : "--"}</span>
                   </div>
                   <div className="meter bar-before">
@@ -824,7 +852,7 @@ export default function Home() {
                 </div>
                 <div className="bar-row">
                   <div className="bar-label">
-                    <span>After</span>
+                    <span>{t("After", "之后")}</span>
                     <span>{result ? result.stress_after : "--"}</span>
                   </div>
                   <div className="meter bar-after">
@@ -835,9 +863,9 @@ export default function Home() {
             </article>
 
             <article className="card cuts-card">
-              <div className="eyebrow">Cut recommendations</div>
+              <div className="eyebrow">{t("Cut recommendations", "削减建议")}</div>
               <ul className="cut-list">
-                {(result?.cut_recommendations ?? ["Cuts will appear here."])
+                {(result?.cut_recommendations ?? [t("Cuts will appear here.", "削减建议会显示在这里。")])
                   .slice(0, 4)
                   .map((item) => (
                     <li key={item}>{item}</li>
@@ -849,7 +877,7 @@ export default function Home() {
               className="card load-card"
               style={{ gridColumn: "span 2" }}
             >
-              <div className="eyebrow">Top load this week</div>
+              <div className="eyebrow">{t("Top load this week", "本周主要负荷")}</div>
               {(() => {
                 const items = (result?.workload_breakdown ?? [
                   { label: "CHE 160A lab", estimated_hours_per_week: 12 },
@@ -932,8 +960,8 @@ export default function Home() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">3. Plan comparison</div>
-              <h2>Plan A / B / C simulation</h2>
+              <div className="eyebrow">{t("3. Plan comparison", "3. 方案对比")}</div>
+              <h2>{t("Plan A / B / C simulation", "A / B / C 方案模拟")}</h2>
             </div>
           </div>
 
@@ -942,10 +970,10 @@ export default function Home() {
               <article key={`curve-${plan.key}`} className={`curve-card curve-${plan.key.toLowerCase()}`}>
                 <div className="curve-head">
                   <div>
-                    <div className="curve-key">Plan {plan.key}</div>
+                    <div className="curve-key">{t("Plan", "方案")} {plan.key}</div>
                     <h3>{plan.label}</h3>
                   </div>
-                  <div className="score-chip">Stress {plan.stress}</div>
+                  <div className="score-chip">{t("Stress", "压力")} {plan.stress}</div>
                 </div>
                 <div className="curve-svg-wrap">
                   <svg
@@ -1035,12 +1063,12 @@ export default function Home() {
                 <article key={plan.key} className={`plan-card plan-${plan.key.toLowerCase()}`}>
                   <div className="plan-top">
                     <div className="plan-key">{plan.key}</div>
-                    <div className="score-chip">Feasibility {plan.feasibility}%</div>
+                    <div className="score-chip">{t("Feasibility", "可行性")} {plan.feasibility}%</div>
                   </div>
                   <h3>{plan.label}</h3>
                   <p className="tiny plan-subtitle">{plan.subtitle}</p>
                   <p className="micro-copy">{plan.summary}</p>
-                  <div className="tiny plan-stats">Stress {plan.stress} · Feasibility {plan.feasibility}%</div>
+                  <div className="tiny plan-stats">{t("Stress", "压力")} {plan.stress} · {t("Feasibility", "可行性")} {plan.feasibility}%</div>
                   <ul className="plan-cut-list">
                     {plan.cuts.map((item) => (
                       <li key={`${plan.key}-${item}`}>{item}</li>
@@ -1055,10 +1083,10 @@ export default function Home() {
         <section className="panel">
           <div className="section-head">
             <div>
-              <div className="eyebrow">4. Voice</div>
-              <h2>AI-generated support</h2>
+              <div className="eyebrow">{t("4. Voice", "4. 语音")}</div>
+              <h2>{t("AI-generated support", "AI 生成的支持")}</h2>
             </div>
-            <p className="micro-copy">Small, opt-in, secondary</p>
+            <p className="micro-copy">{t("Small, opt-in, secondary", "轻量、选择性、辅助")}</p>
           </div>
 
           <div className="voice-grid">
@@ -1069,14 +1097,14 @@ export default function Home() {
                   onClick={() => handleVoice("calm")}
                   disabled={voiceLoading !== null}
                 >
-                  {voiceLoading === "calm" ? "Generating..." : "Play Calm Voice"}
+                  {voiceLoading === "calm" ? t("Generating...", "生成中…") : t("Play Calm Voice", "播放舒缓语音")}
                 </button>
                 <button
                   className="danger-btn"
                   onClick={() => handleVoice("emergency")}
                   disabled={voiceLoading !== null}
                 >
-                  {voiceLoading === "emergency" ? "Generating..." : "Emergency Comfort Mode"}
+                  {voiceLoading === "emergency" ? t("Generating...", "生成中…") : t("Emergency Comfort Mode", "紧急安抚模式")}
                 </button>
               </div>
               <label className="consent-row">
@@ -1085,7 +1113,7 @@ export default function Home() {
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />
-                <span>AI-generated voice</span>
+                <span>{t("AI-generated voice", "AI 生成语音")}</span>
               </label>
             </article>
 
@@ -1101,11 +1129,11 @@ export default function Home() {
             <div className="planner-modal" onClick={(event) => event.stopPropagation()}>
               <div className="planner-modal-head">
                 <div>
-                  <div className="eyebrow">Weekly planner</div>
-                  <h2>0-24 hour week view</h2>
+                  <div className="eyebrow">{t("Weekly planner", "本周计划")}</div>
+                  <h2>{t("0-24 hour week view", "0-24 小时周视图")}</h2>
                 </div>
                 <button className="ghost-btn" onClick={() => setPlannerOpen(false)} type="button">
-                  Close
+                  {t("Close", "关闭")}
                 </button>
               </div>
 
@@ -1127,7 +1155,7 @@ export default function Home() {
                         plannerFocusDay === day ? "planner-expanded-day-active" : ""
                       }`}
                     >
-                      <div className="planner-expanded-head">{day}</div>
+                      <div className="planner-expanded-head">{t(day, ({ Mon: "周一", Tue: "周二", Wed: "周三", Thu: "周四", Fri: "周五", Sat: "周六", Sun: "周日" } as const)[day])}</div>
                       <div className="planner-expanded-cells">
                         {HOURS.map((hour) => (
                           <input
@@ -1136,7 +1164,7 @@ export default function Home() {
                             value={planner[day][hour]}
                             onChange={(e) => handlePlannerCellChange(day, hour, e.target.value)}
                             onFocus={() => setPlannerFocusDay(day)}
-                            placeholder={hour === 0 ? "Add event" : ""}
+                            placeholder={hour === 0 ? t("Add event", "添加事件") : ""}
                           />
                         ))}
                       </div>
@@ -1193,10 +1221,10 @@ export default function Home() {
               }}
             >
               {breathePhase === "in"
-                ? "Breathe in"
+                ? t("Breathe in", "吸气")
                 : breathePhase === "hold"
-                ? "Hold"
-                : "Breathe out"}
+                ? t("Hold", "屏息")
+                : t("Breathe out", "呼气")}
             </div>
             <div
               style={{
@@ -1206,7 +1234,7 @@ export default function Home() {
                 letterSpacing: 1,
               }}
             >
-              click anywhere to close · esc
+              {t("click anywhere to close · esc", "点击任意位置关闭 · Esc")}
             </div>
             <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
           </div>
@@ -1291,10 +1319,10 @@ export default function Home() {
                   margin: 0,
                 }}
               >
-                You&apos;ve done enough
+                {t("You\u2019ve done enough", "你已经做得够多了")}
               </h2>
               <p style={{ fontSize: 15, color: "#9090a0", marginTop: 16 }}>
-                Take a rest. Tomorrow will be better.
+                {t("Take a rest. Tomorrow will be better.", "休息一下，明天会更好。")}
               </p>
               <button
                 onClick={() => setRestOpen(false)}
@@ -1310,23 +1338,51 @@ export default function Home() {
                   backdropFilter: "blur(8px)",
                 }}
               >
-                Maybe later
+                {t("Maybe later", "稍后再说")}
               </button>
             </div>
           </div>
         )}
 
-        {/* Easter-egg side launcher */}
+        {/* Language toggle (top-right) */}
+        <button
+          type="button"
+          onClick={() => setLang((v) => (v === "en" ? "zh" : "en"))}
+          style={{
+            position: "fixed",
+            top: 16,
+            right: 16,
+            zIndex: 50,
+            padding: "6px 14px",
+            borderRadius: 999,
+            border: "1px solid rgba(126,207,255,0.35)",
+            background: "rgba(14,18,24,0.85)",
+            color: "#eaf4ff",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 1,
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          }}
+          aria-label="Language toggle"
+        >
+          <span style={{ opacity: lang === "en" ? 1 : 0.5 }}>EN</span>
+          <span style={{ margin: "0 6px", opacity: 0.5 }}>/</span>
+          <span style={{ opacity: lang === "zh" ? 1 : 0.5 }}>中</span>
+        </button>
+
+        {/* Easter-egg bottom-left launcher */}
         <div
           className="egg-panel"
           style={{
             position: "fixed",
-            right: 0,
-            top: "50%",
-            transform: "translateY(-50%)",
+            left: 16,
+            bottom: 16,
             zIndex: 6000,
             display: "flex",
-            alignItems: "center",
+            flexDirection: "column",
+            alignItems: "flex-start",
             fontFamily: "inherit",
           }}
         >
@@ -1337,7 +1393,7 @@ export default function Home() {
                 flexDirection: "column",
                 gap: 6,
                 padding: 10,
-                marginRight: 10,
+                marginBottom: 10,
                 background: "rgba(14,18,24,0.94)",
                 border: "1px solid rgba(126,207,255,0.25)",
                 borderRadius: 14,
@@ -1358,38 +1414,38 @@ export default function Home() {
                   marginBottom: 4,
                 }}
               >
-                Calm corner
+                {t("Calm corner", "静谧角落")}
               </div>
               <EggItem
                 icon="🏕️"
-                label={tentMode ? "Exit tent mode" : "Build a tent"}
+                label={tentMode ? t("Exit tent mode", "退出搭帐篷模式") : t("Build Tent", "搭帐篷")}
                 color={tentMode ? "#ff5a5a" : "#a259ff"}
                 onClick={() => setTentMode((v) => !v)}
               />
               {tents.length > 0 && (
                 <EggItem
                   icon="🧹"
-                  label={`Clear tents (${tents.length})`}
+                  label={`${t("Clear tents", "清除帐篷")} (${tents.length})`}
                   color="#7a8499"
                   onClick={() => setTents([])}
                 />
               )}
               <EggItem
                 icon="🫁"
-                label="Breathe"
+                label={t("Breathe", "呼吸")}
                 color="#00d2ff"
                 hint="B"
                 onClick={() => setBreatheOpen(true)}
               />
               <EggItem
                 icon="❄️"
-                label="Let it snow"
+                label={t("Snow", "下雪")}
                 color="#bde0ff"
-                onClick={() => setSnowTick((t) => t + 1)}
+                onClick={() => setSnowTick((tick) => tick + 1)}
               />
               <EggItem
                 icon="🌙"
-                label="Rest"
+                label={t("Rest", "休息")}
                 color="#2affa0"
                 onClick={() => setRestOpen(true)}
               />
@@ -1398,27 +1454,27 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setEggOpen((v) => !v)}
-            title="A little corner of calm"
+            title={t("A little corner of calm", "一处小小的静谧角落")}
             style={{
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              padding: "18px 10px",
+              padding: "8px 14px",
               border: "1px solid rgba(126,207,255,0.35)",
-              borderRight: "none",
-              borderRadius: "14px 0 0 14px",
+              borderRadius: 999,
               background:
                 "linear-gradient(180deg, rgba(14,18,24,0.95), rgba(30,40,58,0.95))",
               color: "#eaf4ff",
               cursor: "pointer",
               fontSize: 12,
-              letterSpacing: 3,
+              letterSpacing: 2,
               fontWeight: 600,
               textTransform: "uppercase",
               backdropFilter: "blur(8px)",
-              boxShadow: "-6px 6px 24px rgba(0,0,0,0.4)",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {eggOpen ? "× Close" : "✦ Calm corner"}
+            {eggOpen ? `× ${t("Close", "关闭")}` : `✦ ${t("CALM CORNER", "静谧角落")}`}
           </button>
         </div>
 
