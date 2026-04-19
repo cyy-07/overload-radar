@@ -290,6 +290,23 @@ textarea {
   margin-bottom: 14px;
 }
 
+.what-if-card {
+  margin-top: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(24, 24, 27, 0.06);
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(246, 193, 96, 0.14), transparent 28%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 255, 0.92));
+}
+
+.what-if-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
 .input-accent-card {
   border-radius: 20px;
   padding: 14px 16px;
@@ -346,6 +363,17 @@ textarea {
   outline: none;
 }
 
+.inline-input {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: rgba(251, 251, 251, 0.95);
+  color: var(--text);
+  padding: 12px 14px;
+  outline: none;
+}
+
 .textarea.big {
   min-height: 118px;
 }
@@ -355,6 +383,7 @@ textarea {
 }
 
 .textarea:focus,
+.inline-input:focus,
 .planner-cell-input:focus {
   border-color: rgba(142, 168, 255, 0.55);
   box-shadow: 0 0 0 4px rgba(142, 168, 255, 0.12);
@@ -533,6 +562,28 @@ textarea {
 .score-chip {
   background: rgba(24, 24, 27, 0.05);
   color: #52525b;
+}
+
+.scenario-tag {
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tag-low {
+  background: rgba(125, 210, 168, 0.2);
+  color: #246b49;
+}
+
+.tag-mid {
+  background: rgba(246, 193, 96, 0.22);
+  color: #9a6500;
+}
+
+.tag-high {
+  background: rgba(234, 108, 127, 0.18);
+  color: #a34f5f;
 }
 
 .meter,
@@ -864,6 +915,58 @@ textarea {
   margin-top: 12px;
 }
 
+.metric-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.metric-pill {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(24, 24, 27, 0.05);
+  color: #52525b;
+}
+
+.recommend-card {
+  margin-top: 14px;
+  border-radius: 24px;
+  border: 1px solid rgba(24, 24, 27, 0.06);
+  padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(118, 217, 255, 0.14), transparent 26%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(245, 249, 255, 0.94));
+}
+
+.recommend-grid {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.recommend-grid h3 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.recommend-key {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: #284f9d;
+  background: linear-gradient(145deg, rgba(142, 168, 255, 0.24), rgba(255, 255, 255, 0.94));
+}
+
 .status,
 .error {
   border-radius: 18px;
@@ -894,6 +997,7 @@ textarea {
   }
 
   .input-accent-row,
+  .what-if-grid,
   .planner-mini-grid,
   .toggle-row,
   .curve-board,
@@ -924,6 +1028,7 @@ textarea {
   .dashboard-grid,
   .input-accent-row,
   .input-grid,
+  .what-if-grid,
   .planner-mini-grid,
   .toggle-row,
   .curve-board,
@@ -935,5 +1040,9 @@ textarea {
   .risk-card,
   .summary-card {
     grid-column: auto;
+  }
+
+  .recommend-grid {
+    grid-template-columns: 1fr;
   }
 }
