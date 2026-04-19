@@ -1216,18 +1216,17 @@ export default function Home() {
           </div>
         )}
 
-        {/* Easter-egg floating panel */}
+        {/* Easter-egg side launcher */}
         <div
           className="egg-panel"
           style={{
             position: "fixed",
-            right: 18,
-            bottom: 18,
+            right: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
             zIndex: 6000,
             display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: 8,
+            alignItems: "center",
             fontFamily: "inherit",
           }}
         >
@@ -1235,57 +1234,65 @@ export default function Home() {
             <div
               style={{
                 display: "flex",
+                flexDirection: "column",
                 gap: 6,
-                background: "rgba(14,18,24,0.92)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                padding: 10,
+                marginRight: 10,
+                background: "rgba(14,18,24,0.94)",
+                border: "1px solid rgba(126,207,255,0.25)",
                 borderRadius: 14,
-                padding: 8,
-                backdropFilter: "blur(10px)",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-                animation: "fadeIn 0.25s ease",
+                backdropFilter: "blur(12px)",
+                boxShadow: "0 14px 40px rgba(0,0,0,0.5)",
+                animation: "eggSlideIn 0.25s ease",
+                minWidth: 188,
               }}
             >
-              <button
-                type="button"
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  color: "#7ecfff",
+                  padding: "4px 6px 6px",
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                  marginBottom: 4,
+                }}
+              >
+                Calm corner
+              </div>
+              <EggItem
+                icon="🏕️"
+                label={tentMode ? "Exit tent mode" : "Build a tent"}
+                color={tentMode ? "#ff5a5a" : "#a259ff"}
                 onClick={() => setTentMode((v) => !v)}
-                title="Pitch tents anywhere (press Esc to exit)"
-                style={eggBtn(tentMode ? "#ff5a5a" : "#a259ff")}
-              >
-                🏕️
-              </button>
-              <button
-                type="button"
-                onClick={() => setTents([])}
-                title="Clear tents"
-                disabled={tents.length === 0}
-                style={{ ...eggBtn("#7a8499"), opacity: tents.length ? 1 : 0.35 }}
-              >
-                🧹
-              </button>
-              <button
-                type="button"
+              />
+              {tents.length > 0 && (
+                <EggItem
+                  icon="🧹"
+                  label={`Clear tents (${tents.length})`}
+                  color="#7a8499"
+                  onClick={() => setTents([])}
+                />
+              )}
+              <EggItem
+                icon="🫁"
+                label="Breathe"
+                color="#00d2ff"
+                hint="B"
                 onClick={() => setBreatheOpen(true)}
-                title="Breathe (B)"
-                style={eggBtn("#00d2ff")}
-              >
-                🫁
-              </button>
-              <button
-                type="button"
+              />
+              <EggItem
+                icon="❄️"
+                label="Let it snow"
+                color="#bde0ff"
                 onClick={() => setSnowTick((t) => t + 1)}
-                title="Let it snow"
-                style={eggBtn("#bde0ff")}
-              >
-                ❄️
-              </button>
-              <button
-                type="button"
+              />
+              <EggItem
+                icon="🌙"
+                label="Rest"
+                color="#2affa0"
                 onClick={() => setRestOpen(true)}
-                title="Rest"
-                style={eggBtn("#2affa0")}
-              >
-                🌙
-              </button>
+              />
             </div>
           )}
           <button
@@ -1293,19 +1300,25 @@ export default function Home() {
             onClick={() => setEggOpen((v) => !v)}
             title="A little corner of calm"
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: "50%",
-              border: "1px solid rgba(255,255,255,0.15)",
-              background: "rgba(14,18,24,0.85)",
+              writingMode: "vertical-rl",
+              textOrientation: "mixed",
+              padding: "18px 10px",
+              border: "1px solid rgba(126,207,255,0.35)",
+              borderRight: "none",
+              borderRadius: "14px 0 0 14px",
+              background:
+                "linear-gradient(180deg, rgba(14,18,24,0.95), rgba(30,40,58,0.95))",
               color: "#eaf4ff",
               cursor: "pointer",
-              fontSize: 16,
+              fontSize: 12,
+              letterSpacing: 3,
+              fontWeight: 600,
+              textTransform: "uppercase",
               backdropFilter: "blur(8px)",
-              boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+              boxShadow: "-6px 6px 24px rgba(0,0,0,0.4)",
             }}
           >
-            {eggOpen ? "×" : "✦"}
+            {eggOpen ? "× Close" : "✦ Calm corner"}
           </button>
         </div>
 
@@ -1313,24 +1326,67 @@ export default function Home() {
           @keyframes eggPop { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
           @keyframes eggSnow { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0.4; } }
           @keyframes eggTwinkle { 0%,100% { opacity: 0; } 50% { opacity: 0.7; } }
+          @keyframes eggSlideIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
         `}</style>
       </div>
     </main>
   );
 }
 
-function eggBtn(color: string): React.CSSProperties {
-  return {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    border: `1px solid ${color}55`,
-    background: `${color}14`,
-    color,
-    cursor: "pointer",
-    fontSize: 15,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
+function EggItem({
+  icon,
+  label,
+  color,
+  hint,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  color: string;
+  hint?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 10px",
+        width: "100%",
+        border: `1px solid ${color}40`,
+        background: `${color}10`,
+        color: "#eaf4ff",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontSize: 13,
+        textAlign: "left",
+        transition: "background 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = `${color}22`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = `${color}10`;
+      }}
+    >
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {hint && (
+        <span
+          style={{
+            fontSize: 10,
+            color: "#7a8499",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 4,
+            padding: "1px 5px",
+          }}
+        >
+          {hint}
+        </span>
+      )}
+    </button>
+  );
 }
