@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type PlanCard = {
   label: string;
@@ -10,6 +10,13 @@ type PlanCard = {
   preserved: string[];
   delayed: string[];
   removed: string[];
+};
+
+type WorkloadItem = {
+  label: string;
+  estimated_hours_per_week?: number;
+  complexity?: "low" | "medium" | "high";
+  notes?: string;
 };
 
 type AnalyzeResponse = {
@@ -23,6 +30,8 @@ type AnalyzeResponse = {
   used_mock?: boolean;
   mock_reason?: string | null;
   plans: Record<"A" | "B" | "C", PlanCard>;
+  workload_breakdown?: WorkloadItem[];
+  conflicts?: string[];
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -167,18 +176,21 @@ function buildStressCurve(score: number, key: "A" | "B" | "C") {
   });
 }
 
-function buildSmoothLinePath(points: number[]) {
-  const width = 280;
-  const height = 120;
-  const padding = 14;
-  const usableWidth = width - padding * 2;
-  const usableHeight = height - padding * 2;
+const CURVE_BOX = { width: 300, height: 144, padL: 30, padR: 10, padT: 10, padB: 28 };
 
-  const coordinates = points.map((point, index) => {
-    const x = padding + (usableWidth / (points.length - 1)) * index;
-    const y = height - padding - (point / 100) * usableHeight;
-    return { x, y };
-  });
+function curveCoords(points: number[]) {
+  const { width, height, padL, padR, padT, padB } = CURVE_BOX;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+  return points.map((point, index) => ({
+    x: padL + (plotW / Math.max(1, points.length - 1)) * index,
+    y: padT + plotH - (point / 100) * plotH,
+    value: point,
+  }));
+}
+
+function buildSmoothLinePath(points: number[]) {
+  const coordinates = curveCoords(points);
 
   if (coordinates.length === 0) {
     return "";
@@ -216,6 +228,80 @@ export default function Home() {
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [breatheOpen, setBreatheOpen] = useState(false);
+  const [breathePhase, setBreathePhase] = useState<"in" | "hold" | "out">("in");
+  const [eggOpen, setEggOpen] = useState(false);
+  const [tentMode, setTentMode] = useState(false);
+  const [tents, setTents] = useState<Array<{ id: number; x: number; y: number }>>([]);
+  const [restOpen, setRestOpen] = useState(false);
+  const [snowTick, setSnowTick] = useState(0);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && /input|textarea|select/i.test(target.tagName)) return;
+      if (event.key === "b" || event.key === "B") setBreatheOpen(true);
+      if (event.key === "Escape") {
+        setBreatheOpen(false);
+        setRestOpen(false);
+        setTentMode(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (!tentMode) return;
+    function onClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && target.closest("button, a, input, textarea, select, .egg-panel"))
+        return;
+      setTents((prev) => [
+        ...prev,
+        { id: Date.now() + Math.random(), x: event.clientX, y: event.clientY },
+      ]);
+    }
+    document.body.style.cursor = "crosshair";
+    window.addEventListener("click", onClick);
+    return () => {
+      document.body.style.cursor = "auto";
+      window.removeEventListener("click", onClick);
+    };
+  }, [tentMode]);
+
+  const snowflakes = useMemo(() => {
+    if (snowTick === 0) return [] as Array<{ id: number; left: number; dur: number; size: number; glyph: string }>;
+    return Array.from({ length: 60 }, (_, i) => ({
+      id: snowTick * 1000 + i,
+      left: Math.random() * 100,
+      dur: 3 + Math.random() * 4,
+      size: 12 + Math.random() * 14,
+      glyph: ["❄", "❅", "❆"][Math.floor(Math.random() * 3)],
+    }));
+  }, [snowTick]);
+
+  useEffect(() => {
+    if (snowTick === 0) return;
+    const timer = window.setTimeout(() => setSnowTick(0), 8000);
+    return () => window.clearTimeout(timer);
+  }, [snowTick]);
+
+  useEffect(() => {
+    if (!breatheOpen) return;
+    const cycle: Array<{ phase: "in" | "hold" | "out"; ms: number }> = [
+      { phase: "in", ms: 4000 },
+      { phase: "hold", ms: 4000 },
+      { phase: "out", ms: 4000 },
+    ];
+    let index = 0;
+    setBreathePhase(cycle[0].phase);
+    const id = window.setInterval(() => {
+      index = (index + 1) % cycle.length;
+      setBreathePhase(cycle[index].phase);
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [breatheOpen]);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
 
   const recommendedPlan = useMemo(() => {
@@ -405,7 +491,7 @@ export default function Home() {
 
         {result?.used_mock && (
           <div className="status">
-            Mock analysis active{result.mock_reason ? `: ${result.mock_reason}` : "."}
+            Demo mode: running on curated simulation data so the what-if engine stays responsive.
           </div>
         )}
         {error && <div className="error">{error}</div>}
@@ -658,6 +744,88 @@ export default function Home() {
                   ))}
               </ul>
             </article>
+
+            <article
+              className="card load-card"
+              style={{ gridColumn: "span 2" }}
+            >
+              <div className="eyebrow">Top load this week</div>
+              {(() => {
+                const items = (result?.workload_breakdown ?? [
+                  { label: "CHE 160A lab", estimated_hours_per_week: 12 },
+                  { label: "CS 228 deep learning", estimated_hours_per_week: 10 },
+                  { label: "Student assistant shifts", estimated_hours_per_week: 9 },
+                  { label: "EE 132 deliverables", estimated_hours_per_week: 6 },
+                ]).slice(0, 4);
+                const maxHrs = Math.max(
+                  1,
+                  ...items.map((it) => it.estimated_hours_per_week ?? 4)
+                );
+                const complexityColor: Record<string, string> = {
+                  high: "#ff7a6b",
+                  medium: "#ffb347",
+                  low: "#6cc4a1",
+                };
+                return (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      marginTop: 4,
+                    }}
+                  >
+                    {items.map((it) => {
+                      const hrs = it.estimated_hours_per_week ?? 4;
+                      const pct = Math.round((hrs / maxHrs) * 100);
+                      const color = complexityColor[it.complexity ?? "medium"];
+                      return (
+                        <div key={it.label}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              fontSize: 12,
+                              marginBottom: 4,
+                              color: "#2f3a4a",
+                            }}
+                          >
+                            <span
+                              style={{
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                maxWidth: "70%",
+                              }}
+                            >
+                              {it.label}
+                            </span>
+                            <span style={{ fontWeight: 600 }}>{hrs}h</span>
+                          </div>
+                          <div
+                            style={{
+                              height: 6,
+                              borderRadius: 4,
+                              background: "rgba(0,0,0,0.06)",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: `${pct}%`,
+                                height: "100%",
+                                background: color,
+                                transition: "width 0.4s ease",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </article>
           </div>
         </section>
 
@@ -680,20 +848,82 @@ export default function Home() {
                   <div className="score-chip">Stress {plan.stress}</div>
                 </div>
                 <div className="curve-svg-wrap">
-                  <svg viewBox="0 0 280 120" className="curve-svg" role="img" aria-label={`${plan.label} stress curve`}>
-                    <path d="M 14 106 H 266" className="curve-axis-line" />
-                    <path d={buildSmoothLinePath(plan.curve)} className={`curve-path curve-path-${plan.key.toLowerCase()}`} />
-                    {plan.curve.map((point, index) => {
-                      const x = 14 + ((280 - 28) / (plan.curve.length - 1)) * index;
-                      const y = 120 - 14 - (point / 100) * (120 - 28);
-                      return <circle key={`${plan.key}-point-${index}`} cx={x} cy={y} r="3.5" className={`curve-point curve-point-${plan.key.toLowerCase()}`} />;
+                  <svg
+                    viewBox={`0 0 ${CURVE_BOX.width} ${CURVE_BOX.height}`}
+                    className="curve-svg"
+                    role="img"
+                    aria-label={`${plan.label} stress curve`}
+                  >
+                    {[0, 25, 50, 75, 100].map((tick) => {
+                      const { padL, padR, padT, padB, width, height } = CURVE_BOX;
+                      const plotH = height - padT - padB;
+                      const y = padT + plotH - (tick / 100) * plotH;
+                      return (
+                        <g key={`${plan.key}-grid-${tick}`}>
+                          <line
+                            x1={padL}
+                            x2={width - padR}
+                            y1={y}
+                            y2={y}
+                            stroke="currentColor"
+                            strokeOpacity={tick === 0 ? 0.35 : 0.08}
+                            strokeDasharray={tick === 0 ? "" : "2 3"}
+                          />
+                          <text
+                            x={padL - 6}
+                            y={y + 3}
+                            textAnchor="end"
+                            fontSize="8"
+                            fill="currentColor"
+                            opacity={0.55}
+                          >
+                            {tick}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    <path
+                      d={buildSmoothLinePath(plan.curve)}
+                      className={`curve-path curve-path-${plan.key.toLowerCase()}`}
+                    />
+                    {curveCoords(plan.curve).map((coord, index) => (
+                      <g key={`${plan.key}-point-${index}`}>
+                        <circle
+                          cx={coord.x}
+                          cy={coord.y}
+                          r="3.5"
+                          className={`curve-point curve-point-${plan.key.toLowerCase()}`}
+                        >
+                          <title>{`${WEEK_AXIS[index]} · Stress ${coord.value}`}</title>
+                        </circle>
+                        <circle
+                          cx={coord.x}
+                          cy={coord.y}
+                          r="10"
+                          fill="transparent"
+                          style={{ cursor: "pointer" }}
+                        >
+                          <title>{`${WEEK_AXIS[index]} · Stress ${coord.value}`}</title>
+                        </circle>
+                      </g>
+                    ))}
+                    {WEEK_AXIS.map((label, index) => {
+                      const coord = curveCoords(plan.curve)[index];
+                      return (
+                        <text
+                          key={`${plan.key}-axis-${index}`}
+                          x={coord.x}
+                          y={CURVE_BOX.height - 8}
+                          textAnchor="middle"
+                          fontSize="9"
+                          fill="currentColor"
+                          opacity={0.6}
+                        >
+                          {label}
+                        </text>
+                      );
                     })}
                   </svg>
-                  <div className="curve-axis-labels">
-                    {WEEK_AXIS.map((label, index) => (
-                      <span key={`${plan.key}-axis-${index}`}>{label}</span>
-                    ))}
-                  </div>
                 </div>
               </article>
             ))}
@@ -817,7 +1047,290 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {breatheOpen && (
+          <div
+            onClick={() => setBreatheOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(4,8,16,0.88)",
+              backdropFilter: "blur(14px)",
+              zIndex: 9999,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              animation: "fadeIn 0.4s ease",
+            }}
+          >
+            <div
+              style={{
+                width: 140,
+                height: 140,
+                borderRadius: "50%",
+                background:
+                  "radial-gradient(circle at 30% 30%, #7ecfff, #6c5bd1 70%)",
+                boxShadow: "0 0 80px rgba(126,207,255,0.45)",
+                transform:
+                  breathePhase === "in"
+                    ? "scale(1.5)"
+                    : breathePhase === "hold"
+                    ? "scale(1.5)"
+                    : "scale(1)",
+                transition: "transform 4s ease-in-out",
+              }}
+            />
+            <div
+              style={{
+                marginTop: 36,
+                color: "#eaf4ff",
+                fontSize: 18,
+                letterSpacing: 4,
+                textTransform: "uppercase",
+                fontWeight: 300,
+              }}
+            >
+              {breathePhase === "in"
+                ? "Breathe in"
+                : breathePhase === "hold"
+                ? "Hold"
+                : "Breathe out"}
+            </div>
+            <div
+              style={{
+                marginTop: 14,
+                color: "#7a8499",
+                fontSize: 12,
+                letterSpacing: 1,
+              }}
+            >
+              click anywhere to close · esc
+            </div>
+            <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
+          </div>
+        )}
+
+        {/* Tent markers */}
+        {tents.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              position: "fixed",
+              left: t.x - 12,
+              top: t.y - 14,
+              fontSize: 22,
+              pointerEvents: "none",
+              filter: "drop-shadow(0 0 6px rgba(42,255,160,0.6))",
+              animation: "eggPop 0.3s cubic-bezier(.175,.885,.32,1.275)",
+              zIndex: 5000,
+            }}
+          >
+            🏕️
+          </div>
+        ))}
+
+        {/* Snowfall */}
+        {snowflakes.map((f) => (
+          <div
+            key={f.id}
+            style={{
+              position: "fixed",
+              top: -20,
+              left: `${f.left}vw`,
+              fontSize: f.size,
+              color: "#fff",
+              textShadow: "0 0 6px rgba(255,255,255,0.7)",
+              pointerEvents: "none",
+              zIndex: 5000,
+              animation: `eggSnow ${f.dur}s linear forwards`,
+            }}
+          >
+            {f.glyph}
+          </div>
+        ))}
+
+        {/* Rest overlay */}
+        {restOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "linear-gradient(180deg,#0d1020 0%,#060810 100%)",
+              zIndex: 9998,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              animation: "fadeIn 1s ease",
+            }}
+          >
+            {Array.from({ length: 50 }).map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  position: "absolute",
+                  width: 2,
+                  height: 2,
+                  background: "#fff",
+                  borderRadius: "50%",
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  opacity: 0,
+                  animation: `eggTwinkle 3s ease-in-out ${Math.random() * 3}s infinite`,
+                }}
+              />
+            ))}
+            <div style={{ textAlign: "center", color: "#e0e0e0" }}>
+              <h2
+                style={{
+                  fontSize: 32,
+                  fontWeight: 300,
+                  letterSpacing: 4,
+                  margin: 0,
+                }}
+              >
+                You&apos;ve done enough
+              </h2>
+              <p style={{ fontSize: 15, color: "#9090a0", marginTop: 16 }}>
+                Take a rest. Tomorrow will be better.
+              </p>
+              <button
+                onClick={() => setRestOpen(false)}
+                style={{
+                  marginTop: 32,
+                  padding: "10px 24px",
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  color: "#fff",
+                  borderRadius: 24,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Easter-egg floating panel */}
+        <div
+          className="egg-panel"
+          style={{
+            position: "fixed",
+            right: 18,
+            bottom: 18,
+            zIndex: 6000,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 8,
+            fontFamily: "inherit",
+          }}
+        >
+          {eggOpen && (
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                background: "rgba(14,18,24,0.92)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 14,
+                padding: 8,
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+                animation: "fadeIn 0.25s ease",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setTentMode((v) => !v)}
+                title="Pitch tents anywhere (press Esc to exit)"
+                style={eggBtn(tentMode ? "#ff5a5a" : "#a259ff")}
+              >
+                🏕️
+              </button>
+              <button
+                type="button"
+                onClick={() => setTents([])}
+                title="Clear tents"
+                disabled={tents.length === 0}
+                style={{ ...eggBtn("#7a8499"), opacity: tents.length ? 1 : 0.35 }}
+              >
+                🧹
+              </button>
+              <button
+                type="button"
+                onClick={() => setBreatheOpen(true)}
+                title="Breathe (B)"
+                style={eggBtn("#00d2ff")}
+              >
+                🫁
+              </button>
+              <button
+                type="button"
+                onClick={() => setSnowTick((t) => t + 1)}
+                title="Let it snow"
+                style={eggBtn("#bde0ff")}
+              >
+                ❄️
+              </button>
+              <button
+                type="button"
+                onClick={() => setRestOpen(true)}
+                title="Rest"
+                style={eggBtn("#2affa0")}
+              >
+                🌙
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setEggOpen((v) => !v)}
+            title="A little corner of calm"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(14,18,24,0.85)",
+              color: "#eaf4ff",
+              cursor: "pointer",
+              fontSize: 16,
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+            }}
+          >
+            {eggOpen ? "×" : "✦"}
+          </button>
+        </div>
+
+        <style>{`
+          @keyframes eggPop { from { transform: scale(0) rotate(-20deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+          @keyframes eggSnow { 0% { transform: translateY(-10px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0.4; } }
+          @keyframes eggTwinkle { 0%,100% { opacity: 0; } 50% { opacity: 0.7; } }
+        `}</style>
       </div>
     </main>
   );
+}
+
+function eggBtn(color: string): React.CSSProperties {
+  return {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    border: `1px solid ${color}55`,
+    background: `${color}14`,
+    color,
+    cursor: "pointer",
+    fontSize: 15,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
 }

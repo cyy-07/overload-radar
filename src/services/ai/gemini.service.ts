@@ -3,7 +3,7 @@ import { buildAnalysisPrompt, type AcademicInputBundle } from "./prompt.template
 import { parseOverloadAnalysis, type OverloadAnalysis } from "./response.schema";
 
 function getGeminiUrl() {
-  const model = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
+  const model = process.env.GEMINI_MODEL ?? "gemini-flash-latest";
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 }
 
